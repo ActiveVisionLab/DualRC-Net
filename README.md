@@ -66,11 +66,11 @@ python eval_aachen_reconstruct.py
 ## BibTex
 If you use this code, please cite our paper
 ```bibtex
-@inproceedings{Li2020Dual,
-author    = {Xinghui Li and Kai Han and Shuda Li and Victor Prisacariu},
-title     = {Dual-Resolution Correspondence Networks},
-booktitle = {Conference on Neural Information Processing Systems (NeurIPS)},
-year      = {2020},
+@inproceedings{li20dualrc,
+ author		= {Xinghui Li and Kai Han and Shuda Li and Victor Prisacariu},
+ title   	= {Dual-Resolution Correspondence Networks},
+ booktitle 	= {Conference on Neural Information Processing Systems (NeurIPS)},
+ year    	= {2020},
 }
 ```
 
