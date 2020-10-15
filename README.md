@@ -12,10 +12,10 @@ To activate the environment, run
 ```
 conda activate dualrcnet
 ```
-## Preparing Data
+## Preparing data
 We train our model on [MegaDepth](https://www.cs.cornell.edu/projects/megadepth/) dataset. To prepare for the data, you need
-to download the **MegaDepth SfM models** from [MegaDepth](https://www.cs.cornell.edu/projects/megadepth/) website and 
-download `training_pairs.txt` and `validation_pairs.txt` from the [link](https://drive.google.com/drive/folders/1_Ha3xY_1u9Wpb7oV8rEr0Jy8mL3HGnp9?usp=sharing).
+to download the **MegaDepth SfM models** from the [MegaDepth](https://www.cs.cornell.edu/projects/megadepth/) website and 
+download `training_pairs.txt` and `validation_pairs.txt` from this [link](https://drive.google.com/drive/folders/1_Ha3xY_1u9Wpb7oV8rEr0Jy8mL3HGnp9?usp=sharing).
 Then place both `training_pairs.txt` and `validation_pairs.txt` files under the downloaded directory `MegaDepth_v1_SfM`.
 
 ## Training
@@ -24,14 +24,14 @@ After downloading the training data, run
 python train.py --training_file path/to/training_pairs.txt --validation_file path/to/validation_pairs.txt --image_path path/to/MegaDepth_v1_SfM
 ```
 
-## Pre-trained Model
-We also provide our pre-trained model. You can download `dualrc-net.pth.tar` from the [link](https://drive.google.com/drive/folders/1_Ha3xY_1u9Wpb7oV8rEr0Jy8mL3HGnp9?usp=sharing)
-and place it under directory `trained_models`.
+## Pre-trained model
+We also provide our pre-trained model. You can download `dualrc-net.pth.tar` from this [link](https://drive.google.com/drive/folders/1_Ha3xY_1u9Wpb7oV8rEr0Jy8mL3HGnp9?usp=sharing)
+and place it under the directory `trained_models`.
 
 ## Evaluation on HPatches
 The dataset can be downloaded from [HPatches](https://github.com/hpatches/hpatches-dataset) repo. You need to download 
 **HPatches full sequences**.\
-After downloading the dataset, then
+After downloading the dataset, then:
 1. Browse to `HPatches/`
 2. Run `python eval_hpatches.py --checkpoint path/to/model --root path/to/parent/directory/of/hpatches_sequences`. This will
 generate a text file which stores the result in current directory.
@@ -49,7 +49,7 @@ This will generate a series of matches files in the `inloc/matches/` directory t
 4. Use the `inloc/eval_inloc_generate_plot.m` file to plot the results from shortlist file generated in the previous stage: `/your_path_to/InLoc_demo_old/experiment_name/shortlist_densePV.mat`. Precomputed shortlist files are provided in `inloc/shortlist`.
 
 ## Evaluation on Aachen Day-Night
-In order to run the Aachen Day-Night evaluation, you first need to clone the [Visualization benchmark repo](https://github.com/tsattler/visuallocalizationbenchmark), and download and compile [all the required depedencies](https://github.com/tsattler/visuallocalizationbenchmark/tree/master/local_feature_evaluation) (in particular, you'll need to compile Colmap if you have not done so yet). Then:
+In order to run the Aachen Day-Night evaluation, you first need to clone the [Visualization benchmark repo](https://github.com/tsattler/visuallocalizationbenchmark), and download and compile [all the required depedencies](https://github.com/tsattler/visuallocalizationbenchmark/tree/master/local_feature_evaluation) (note that you'll need to compile Colmap if you have not done so yet). Then:
 
 1. Browse to `aachen_day_and_night/`. 
 2. Run `python eval_aachen_extract.py` adjusting the checkpoint and experiment name.
@@ -63,18 +63,16 @@ python eval_aachen_reconstruct.py
 ```
 4. Upload the file `/path_to_aachen/aachen/Aachen_eval_[experiment_name].txt` to `https://www.visuallocalization.net/` to get the results on this benchmark.
 
-## Bibtex
+## BibTex
 If you use this code, please cite our paper
-```
-          @inproceedings{Li2020Dual,
-            author    = {Xinghui Li and Kai Han and Shuda Li and Victor Prisacariu},
-            title     = {Dual-Resolution Correspondence Networks},
-            booktitle = {Conference on Neural Information Processing Systems (NeurIPS)},
-            year      = {2020},
-          }
+```bibtex
+@inproceedings{Li2020Dual,
+author    = {Xinghui Li and Kai Han and Shuda Li and Victor Prisacariu},
+title     = {Dual-Resolution Correspondence Networks},
+booktitle = {Conference on Neural Information Processing Systems (NeurIPS)},
+year      = {2020},
+}
 ```
 
 ## Acknowledgement
-Our code is based on wonderful code provided by [NCNet](https://www.di.ens.fr/willow/research/ncnet/), [Sparse-NCNet](https://www.di.ens.fr/willow/research/sparse-ncnet/)
-as well as [ANC-Net](https://ancnet.active.vision/). A part of the experimental results is borrowed from [Sparse-NCNet](https://www.di.ens.fr/willow/research/sparse-ncnet/). 
-If you use this code, please cite them as well.
+Our code is based on the wonderful code provided by [NCNet](https://www.di.ens.fr/willow/research/ncnet/), [Sparse-NCNet](https://www.di.ens.fr/willow/research/sparse-ncnet/) and [ANC-Net](https://ancnet.active.vision/).
