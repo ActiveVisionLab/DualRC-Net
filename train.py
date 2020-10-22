@@ -56,7 +56,7 @@ parser.add_argument('--fine_coarse_ratio', type=int, default=4, help='The ratio 
 
 parser.add_argument('--weight_loss', nargs='+', type=float, default = [0., 1, 0 ],help='the weight for sparse strong and weak loss ' )
 parser.add_argument('--mode', type=int, default=1, help='0: 1NN, 1:4NN')
-parser.add_argument('--loss', type=str, default='meanfnorm',help='specify the type of loss: meanfnorm, orthogonal_meanfnorm, displacement, balanced')
+parser.add_argument('--loss', type=str, default='orthogonal_meanfnorm',help='specify the type of loss: meanfnorm, orthogonal_meanfnorm, displacement, balanced')
 parser.add_argument('--gauss_size', type=int, default = 3, help='blur ground truth, it can be 0 3 5 7')
 parser.add_argument('--weight_orthogonal', type=float, default=0.05,help='the weight for orthogonal term.')
 parser.add_argument('--numKey', type=int, default=128, help='number of keypoints for each image pair')
