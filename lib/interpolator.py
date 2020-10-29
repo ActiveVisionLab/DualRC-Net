@@ -3,14 +3,8 @@ from collections import OrderedDict
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
-from torch.autograd import Variable
-import torchvision.models as models
-import sys
 import numpy as np
-import numpy.matlib
-import pickle
-import math
-import matplotlib.pyplot as plt
+
 
 
 class Interpolator(nn.Module):
@@ -52,7 +46,7 @@ class Interpolator(nn.Module):
         feature_per_kp = feature_per_kp * mask
         return feature_per_kp
 
-    def forward(self, feature, keypoints, Hf=None, Wf=None, order=1):
+    def forward(self, feature, keypoints, Hf=None, Wf=None):
         """
         Interpolator(): collects a set of sparse key points by interpolating from
                        the feature map.
@@ -104,7 +98,7 @@ class Interpolator(nn.Module):
         # print('xY*xY', (xX*yY)[0,1])
         coeff = (xX * yY).contiguous().view(B, -1)  # B x N*4
         # print('coeff', coeff[0,:8])
-        coeff = coeff.unsqueeze(dim=1).expand(-1, order*order*C, -1)  # B x C x N*4
+        coeff = coeff.unsqueeze(dim=1).expand(-1, C, -1)  # B x C x N*4
 
         # print('H', H, 'W', W)
         indices = (iY * W + iX).view(B, N * 4)  # B x N*4
@@ -117,11 +111,9 @@ class Interpolator(nn.Module):
 
 
         # UF *= self.im_fe_ratio
-        if order > 1:
-            UF = self.interp_feature(UF, Hf, Wf, order)
         UF = (UF * coeff)  # B x
         # np.savetxt('UF', UF[0,:,:8].detach().cpu().numpy() )
-        UF = UF.reshape(B, order*order*C, N, -1)
+        UF = UF.reshape(B, C, N, -1)
         # np.savetxt('UF2', UF[0,:,1,:].detach().cpu().numpy() )
         UF = UF.sum(dim=3)  # B x C x N
         # print('UF',UF.shape)
@@ -129,15 +121,6 @@ class Interpolator(nn.Module):
         # print('UF', UF.shape)
         # print('UF', UF.shape)
         return UF
-
-    def interp_feature(self, UF, Hf, Wf, order):
-        B, _, N = UF.shape
-        UF = UF.transpose(1, 2)     # B x N*4 X C
-        UF = UF.view(B, N, Hf, Wf)      # B x N*4 x Hf x Wf
-        UF = F.interpolate(UF, size=(Hf*order, Wf*order), mode='bilinear', align_corners=True)      # B x N*4 x o*Hf x o*Wf
-        UF = UF.view(B, N, -1).transpose(1, 2)      # B x o*Hf*o*Wf x N*4
-        return UF
-
 
 
 class LocationInterpolator(nn.Module):

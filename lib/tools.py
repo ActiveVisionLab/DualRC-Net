@@ -26,13 +26,12 @@ def calc_gt_indices(batch_keys_gt ,batch_assignments_gt):
 
 
 class ExtractFeatureMap:
-    def __init__(self, im_fe_ratio, order=1, use_cuda = True, device=None):
+    def __init__(self, im_fe_ratio, use_cuda = True, device=None):
         # im_fe_ratio, the ratio between the input image resolution to feature map resolution
         self.im_fe_ratio = im_fe_ratio
         # interp [object of Interpolator]: to interpolate the correlation maps
         self.use_cuda = use_cuda
         self.interp = interpolator.Interpolator(im_fe_ratio, device)
-        self.order = order
         self.device = device
     def normalise_per_row(self, keycorr):
         """
@@ -66,16 +65,16 @@ class ExtractFeatureMap:
         if source_to_target:
             corr = corr.view(B, H1, W1, H2 * W2)
             corr = corr.permute(0, 3, 1, 2)
-            keycorr = self.interp(corr, query_keypoints, H2, W2, self.order)  # keycorr B x H2*W2 x N, key is source
+            keycorr = self.interp(corr, query_keypoints, H2, W2)  # keycorr B x H2*W2 x N, key is source
             keycorr = keycorr.permute(0, 2, 1)  # B x N x H2*W2
-            keycorr = keycorr.view(B, N, self.order*H2, self.order*W2)  # B x N x H2 x W2
-            H, W = self.order*H2, self.order*W2
+            keycorr = keycorr.view(B, N, H2, W2)  # B x N x H2 x W2
+            H, W = H2, W2
         else:
             corr = corr.view(B, H1 * W1, H2, W2)
-            keycorr = self.interp(corr, query_keypoints, H1, W1, self.order)  # keycorr B x H1*W1 x N query_keypoints is target point
+            keycorr = self.interp(corr, query_keypoints, H1, W1)  # keycorr B x H1*W1 x N query_keypoints is target point
             keycorr = keycorr.permute(0, 2, 1)  # B x N x H1*W1
-            keycorr = keycorr.view(B, N, self.order*H1, self.order*W1)  # B x N x H1 x W1
-            H, W = H1*self.order, W1*self.order
+            keycorr = keycorr.view(B, N, H1, W1)  # B x N x H1 x W1
+            H, W = H1, W1
 
         keycorr = keycorr.view(B, N, -1).contiguous()
         # try softmax
@@ -109,7 +108,7 @@ class ExtractFeatureMap:
         # xA = XA[indices.view(-1)].view(B, N, 1)
         # yA = YA[indices.view(-1)].view(B, N, 1)
         xyA = torch.cat((xA, yA), 2)
-        xyA *= self.im_fe_ratio / self.order
+        xyA *= self.im_fe_ratio
         end = time.time()
         return xyA, score, end-start
 
