@@ -63,7 +63,6 @@ class Conv4d(_ConvNd):
     """Applies a 4D convolution over an input signal composed of several input
     planes.
     """
-
     def __init__(self, in_channels, out_channels, kernel_size, groups=1,bias=True, pre_permuted_filters=True):
         # stride, dilation and groups !=1 functionality not tested 
         stride=1
@@ -74,9 +73,11 @@ class Conv4d(_ConvNd):
         stride = _quadruple(stride)
         padding = _quadruple(padding)
         dilation = _quadruple(dilation)
+        torch_versions = [int(v) for v in torch.__version__.split(".")[:-1]]
+        zeros = 'zeros' if (torch_versions[0] == 1 and torch_versions[1] >= 7) else 'zero'
         super(Conv4d, self).__init__(
             in_channels, out_channels, kernel_size, stride, padding, dilation,
-            False, _quadruple(0), groups, bias, 'zero')
+            False, _quadruple(0), groups, bias, zeros)
         # weights will be sliced along one dimension during convolution loop
         # make the looping dimension to be the first one in the tensor, 
         # so that we don't need to call contiguous() inside the loop
