@@ -135,7 +135,6 @@ class ImgMatcher:
     This is the class that integrate the model and all postprocessing part together
     '''
     def __init__(self, checkpoint, use_cuda, half_precision, im_fe_ratio = 16, postprocess_device = None):
-        self.im_fe_ratio = im_fe_ratio
 
         checkpoint_ = torch.load(checkpoint)
         multi_gpu = checkpoint_['args'].multi_gpu
@@ -144,8 +143,9 @@ class ImgMatcher:
         self.model.eval()
         self.feature_extractor = ExtractFeatureMap(im_fe_ratio=self.im_fe_ratio, device=postprocess_device)
         self.postprocess_device = postprocess_device
+        self.im_fe_ratio = im_fe_ratio
 
-    def __call__(self, batch, num_pts=2000, iter_step=1000, central_align = True, selection = 'partial', *args, **kwargs):
+    def __call__(self, batch, num_pts=2000, iter_step=1000, central_align = True, *args, **kwargs):
         '''
         Input:
             batch:
@@ -156,8 +156,6 @@ class ImgMatcher:
                 [int] step when calculate the matches. Leave it fixed.
             central_align:
                 [bool] whether to centrally align the feature map and image.
-            selection:
-                [string] Either 'full' or 'partial'. full mean calculate the full fine-resolution 4D corr. partial means
                 using coarse-resolution 4D corr to select preliminary region.
         Output
             matches:
@@ -170,106 +168,56 @@ class ImgMatcher:
         batch['source_image'] = batch['source_image'].cuda()
         batch['target_image'] = batch['target_image'].cuda()
 
-        if selection == 'full':
-            '''
-            This is the matching version with 
-            '''
-            output = self.model(batch)
-            corr4d, feature_A0, feature_B0 = output
-            # move output to the gpu of feature_extractor if two things are not on the same device
-            if torch.cuda.current_device() != self.feature_extractor.device:
-                corr4d = corr4d.cuda(self.feature_extractor.device)
-                feature_A0 = feature_A0.cuda(self.feature_extractor.device)
-                feature_B0 = feature_B0.cuda(self.feature_extractor.device)
+        output = self.model(batch)
+        corr4d, feature_A0, feature_B0 = output
+        # move output to the gpu of feature_extractor if two things are not on the same device
+        if torch.cuda.current_device() != self.feature_extractor.device:
+            start = time.time()
+            corr4d = corr4d.cuda(self.feature_extractor.device)
+            feature_A0 = feature_A0.cuda(self.feature_extractor.device)
+            feature_B0 = feature_B0.cuda(self.feature_extractor.device)
+            end = time.time()
+            print('Time for transferring tensor to a different GPU %f second'%(end-start))
+        output = (corr4d, feature_A0, feature_B0)
+        self.high_low_ratio = int(np.round(feature_A0.shape[2] / corr4d.shape[2]))
 
-            output = (corr4d, feature_A0, feature_B0)
-            self.high_low_ratio = int(np.round(feature_A0.shape[2] / corr4d.shape[2]))
+        # use corr4d as a pre-processing filter
+        query_src = self.generate_query_from_corr4d(corr4d)
+        query_src = query_src.cuda(self.feature_extractor.device)
 
-            # make grid
-            query_src = self.make_grid(feature_A0.shape[0], feature_A0.shape[2], feature_A0.shape[3]) / self.high_low_ratio * self.im_fe_ratio   # B x H*W x 2 in image coordinate
-            query_src = query_src.cuda(self.feature_extractor.device)
+        matches_src_to_ref, scores_src_to_ref = self.find_matches(output, query_src,
+                                                                  source_to_target=True,
+                                                                  iter_step=iter_step)  # B x H*W x 2 in image coordinate
+        matches_src_to_ref_to_src, scores_src_to_ref_to_src = self.find_matches(output, matches_src_to_ref,
+                                                                                source_to_target=False,
+                                                                                iter_step=iter_step)  # B x H*W x 2 in image coordinate
 
-            matches_src_to_ref, scores_src_to_ref = self.find_matches(output, query_src,
-                                                                 source_to_target=True, iter_step=iter_step)  # B x H*W x 2 in image coordinate
-            matches_src_to_ref_to_src, scores_src_to_ref_to_src = self.find_matches(output, matches_src_to_ref,
-                                                                               source_to_target=False, iter_step=iter_step)  # B x H*W x 2 in image coordinate
+        # pick out the mutual neighbour
+        src_to_ref = torch.cat((query_src, matches_src_to_ref), dim=2)
+        ref_to_src = torch.cat((matches_src_to_ref_to_src, matches_src_to_ref), dim=2)
+        src_to_ref = src_to_ref / (self.im_fe_ratio / self.high_low_ratio)  # convert into feature coordinate
+        ref_to_src = ref_to_src / (self.im_fe_ratio / self.high_low_ratio)
 
-            # pick out the mutual neighbour
-            src_to_ref = torch.cat((query_src, matches_src_to_ref), dim=2)
-            ref_to_src = torch.cat((matches_src_to_ref_to_src, matches_src_to_ref), dim=2)
-            src_to_ref = src_to_ref / (self.im_fe_ratio / self.high_low_ratio)  # convert into feature coordinate
-            ref_to_src = ref_to_src / (self.im_fe_ratio / self.high_low_ratio)
-            result = src_to_ref - ref_to_src
-            result = torch.norm(result, dim=2)
-            matches = src_to_ref[result == 0]
-            scores_src_to_ref = scores_src_to_ref[result == 0]
-            scores_src_to_ref_to_src = scores_src_to_ref_to_src[result == 0]
-            scores = scores_src_to_ref_to_src + scores_src_to_ref
+        result = src_to_ref - ref_to_src
+        result = torch.norm(result, dim=2)
+        matches = src_to_ref[result == 0]
+        scores_src_to_ref = scores_src_to_ref[result == 0]
+        scores_src_to_ref_to_src = scores_src_to_ref_to_src[result == 0]
+        scores = scores_src_to_ref_to_src + scores_src_to_ref
 
-            # only select the first num_pts
-            scores, indice = torch.sort(scores, descending=True)
-            matches = matches[indice]
-            matches = matches[:num_pts, :]
-            scores = scores[:num_pts]
-            print('Number of matches output', scores.shape[0])
+        # only select the first 'num_pts
+        scores, indice = torch.sort(scores, descending=True)
+        matches = matches[indice]
+        matches = matches[:num_pts, :]
+        scores = scores[:num_pts]
+        print('Number of matches output', scores.shape[0])
 
-            if central_align:
-                matches = matches + 0.5
+        if central_align:
+            matches = matches + 0.5
 
-            matches = matches * (self.im_fe_ratio / self.high_low_ratio)  # convert to image coordinate
-            return matches, scores, output
+        matches = matches * (self.im_fe_ratio / self.high_low_ratio)  # convert to image coordinate
 
-        if selection == 'partial':
-            output = self.model(batch)
-            corr4d, feature_A0, feature_B0 = output
-            # move output to the gpu of feature_extractor if two things are not on the same device
-            if torch.cuda.current_device() != self.feature_extractor.device:
-                start = time.time()
-                corr4d = corr4d.cuda(self.feature_extractor.device)
-                feature_A0 = feature_A0.cuda(self.feature_extractor.device)
-                feature_B0 = feature_B0.cuda(self.feature_extractor.device)
-                end = time.time()
-                print('Time for transferring tensor to a different GPU %f second'%(end-start))
-            output = (corr4d, feature_A0, feature_B0)
-            self.high_low_ratio = int(np.round(feature_A0.shape[2] / corr4d.shape[2]))
-
-            # use corr4d as a pre-processing filter
-            query_src = self.generate_query_from_corr4d(corr4d)
-            query_src = query_src.cuda(self.feature_extractor.device)
-
-            matches_src_to_ref, scores_src_to_ref = self.find_matches(output, query_src,
-                                                                      source_to_target=True,
-                                                                      iter_step=iter_step)  # B x H*W x 2 in image coordinate
-            matches_src_to_ref_to_src, scores_src_to_ref_to_src = self.find_matches(output, matches_src_to_ref,
-                                                                                    source_to_target=False,
-                                                                                    iter_step=iter_step)  # B x H*W x 2 in image coordinate
-
-            # pick out the mutual neighbour
-            src_to_ref = torch.cat((query_src, matches_src_to_ref), dim=2)
-            ref_to_src = torch.cat((matches_src_to_ref_to_src, matches_src_to_ref), dim=2)
-            src_to_ref = src_to_ref / (self.im_fe_ratio / self.high_low_ratio)  # convert into feature coordinate
-            ref_to_src = ref_to_src / (self.im_fe_ratio / self.high_low_ratio)
-
-            result = src_to_ref - ref_to_src
-            result = torch.norm(result, dim=2)
-            matches = src_to_ref[result == 0]
-            scores_src_to_ref = scores_src_to_ref[result == 0]
-            scores_src_to_ref_to_src = scores_src_to_ref_to_src[result == 0]
-            scores = scores_src_to_ref_to_src + scores_src_to_ref
-
-            # only select the first 'num_pts
-            scores, indice = torch.sort(scores, descending=True)
-            matches = matches[indice]
-            matches = matches[:num_pts, :]
-            scores = scores[:num_pts]
-            print('Number of matches output', scores.shape[0])
-
-            if central_align:
-                matches = matches + 0.5
-
-            matches = matches * (self.im_fe_ratio / self.high_low_ratio)  # convert to image coordinate
-
-            return matches, scores, output
+        return matches, scores, output
 
 
     def make_grid(self, B, H, W):
@@ -406,8 +354,7 @@ def mask_over_corr(fe_corr_A, fe_corr_B):
     # fe_corr_A_ = torch.repeat_interleave(fe_corr_A_, ratio, dim=3)
 
     fe_corr_A_ = F.interpolate(fe_corr_A, mode='nearest', size=(HB, WB))
-
-    # fe_corr_A_ = F.interpolate(fe_corr_A, mode='bilinear', size=(HB, WB), align_corners=True)
+    
     # make sure that fe_corr_A_ has the same size as fe_corr_B
     fe_corr_A_ = fe_corr_A_[:, :, :HB, :WB]
     fe_corr_B_ = fe_corr_A_ * fe_corr_B

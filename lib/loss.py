@@ -281,12 +281,6 @@ class SparseStrongWeakLoss(WeakLoss):
         loss = torch.zeros(1, 1).cuda()
         o_loss = torch.zeros(1, 1).cuda()
         reg_loss = torch.zeros(1, 1).cuda()
-        # if self.weight_loss[0] > 0:
-        #     sp_loss = self.loss(X, tnf_batch)
-        #     sp_loss *= self.weight_loss[0]
-        #     loss = sp_loss
-        # else:
-        #     sp_loss = torch.zeros((1,1)).cuda()
 
         if self.weight_loss[0] > 0:  # correlation regularisation term
             # corr [B,1,H1,W1,H2,W2]
@@ -331,9 +325,6 @@ class SparseStrongWeakLoss(WeakLoss):
                 strong_loss += self.diff(keycorrA_B, onehotA_B[0], dst_key_num_gt)
                 strong_loss += self.diff(keycorrA_B, onehotA_B[2], dst_key_num_gt)
 
-            # CrossEntropyLoss
-            # strong_loss = self.celoss(keycorrB_A.view(B*N,-1), iB_A.view(B*N)) + self.celoss(keycorrA_B.view(B*N,-1), iA_B.view(B*N))
-
             strong_loss *= self.weight_loss[1]
 
             if self.orth:
@@ -368,22 +359,7 @@ class SparseStrongWeakLoss(WeakLoss):
             weak_loss = score_neg - score_pos
             weak_loss *= self.weight_loss[2]
             loss += weak_loss
-            # weak_loss = self.weak_supervision( corr, tnf_batch )
-            # weak_loss *= self.weight_loss[2]
 
-            # if self.orth:
-            #     samples = self.sampled_keypoints.expand(B, -1, -1)
-            #     i_gt = self.identity.expand(B, -1, -1)
-
-            #     keycorrB_A = self.extract_featuremap( corr, samples, source_to_target = True )
-            #     keycorrA_B = self.extract_featuremap( corr, samples, source_to_target = False)
-
-            #     wo_loss = self.weak_orthogonal(keycorrB_A, i_gt) + self.weak_orthogonal(keycorrA_B, i_gt)
-            #     dynamic_weight = 0.0001
-            #     loss += (1-dynamic_weight)*weak_loss + dynamic_weight*wo_loss
-            #     o_loss += wo_loss
-            # else:
-            #     loss += weak_loss
         else:
             weak_loss = torch.zeros((1, 1)).cuda()
 

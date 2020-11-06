@@ -16,11 +16,6 @@ class Interpolator(nn.Module):
         self.minXY = torch.zeros(1, 1, 2)
 
     def getMaxMinXY(self, B, N, H, W):
-        # B1, N1, _ = self.maxXY.shape
-        # B2, N2, _ = self.minXY.shape
-        # if B1 == B and N1 == N and B2 == B and N2 == N:
-        #     return self.maxXY, self.minXY
-        # else:
         self.maxXY = torch.ones(1, 1, 2)
         self.minXY = torch.zeros(1, 1, 2)
         self.maxXY[0, 0, 0] = (W - 1)
@@ -54,26 +49,22 @@ class Interpolator(nn.Module):
             feature [float tensor] B x C x H x W: standard feature map
             keypoints [float tensor] B x N x 2: key points
         Return
-            UF [float tensor] B x C x N: the sparse interpolated features collected
+            features [float tensor] B x C x N: the sparse interpolated features collected
                                          at the input sparse key point locations.
                                          note that the rows corresponding to invalid key points
                                          are masked off as zeros.
         """
         B, C, H, W = feature.shape
         feature = feature.view(B, C, -1)  # B x C x HW, B x 1024 x 1024
-        # print('keypoints', keypoints[0,1])
         # convert the key points from the image coordinate to feature map coordinate
         keypoints = keypoints / self.im_fe_ratio
         _, N, _ = keypoints.shape
 
-        # print(keypoints[0])
         maxXY, minXY = self.getMaxMinXY(B, N, H, W)
 
         # nearest neighbours
         iLower = torch.max(torch.floor(keypoints), minXY)  # B x N x 2, index of X, Y
-        # iLower = torch.floor(keypoints)   # B x N x 2, index of X, Y
         iUpper = torch.min(torch.ceil(keypoints), maxXY)
-        # iUpper = torch.ceil(keypoints)
         upper = keypoints - iLower  # note that weight is the 1 - distance
         lower = 1 - upper  # B x N x 2
 
@@ -91,36 +82,18 @@ class Interpolator(nn.Module):
         iY = iY.view(B, N, -1)
         xX = xX.contiguous().view(B, N, -1)
         yY = yY.contiguous().view(B, N, -1)
-        # print('iY', iY[0,1])
-        # print('iX', iX[0,1])
-        # print('xY', yY[0,1])
-        # print('xX', xX[0,1])
-        # print('xY*xY', (xX*yY)[0,1])
         coeff = (xX * yY).contiguous().view(B, -1)  # B x N*4
-        # print('coeff', coeff[0,:8])
         coeff = coeff.unsqueeze(dim=1).expand(-1, C, -1)  # B x C x N*4
 
-        # print('H', H, 'W', W)
         indices = (iY * W + iX).view(B, N * 4)  # B x N*4
-        # print('indices', indices[0,0:8])
         indices = indices.unsqueeze(dim=1).expand(-1, C, -1)  # B x C x N*4
-        # print('2.indices', indices[0, 0, :8], indices[0, 1, :8])
-        UF = torch.gather(feature, 2, indices)  # B x C x N*4       
-        # -> B x C x B x 4
+        features = torch.gather(feature, 2, indices)  # B x C x N*4       
         # interpolation here -> 
-
-
-        # UF *= self.im_fe_ratio
-        UF = (UF * coeff)  # B x
-        # np.savetxt('UF', UF[0,:,:8].detach().cpu().numpy() )
-        UF = UF.reshape(B, C, N, -1)
-        # np.savetxt('UF2', UF[0,:,1,:].detach().cpu().numpy() )
-        UF = UF.sum(dim=3)  # B x C x N
-        # print('UF',UF.shape)
-        UF = self.maskoff(UF, keypoints)
-        # print('UF', UF.shape)
-        # print('UF', UF.shape)
-        return UF
+        features = (features * coeff)  # B x
+        features = features.reshape(B, C, N, -1)
+        features = features.sum(dim=3)  # B x C x N
+        features = self.maskoff(features, keypoints)
+        return features
 
 
 class LocationInterpolator(nn.Module):
@@ -253,20 +226,12 @@ class InverInterpolator(Interpolator):
         onehot0 = torch.zeros(B, N, H * W).cuda(self.device)
         onehot0.scatter_(dim=2, index=indices, src=coeff)
 
-
         mask = Xg.sum(dim=2, keepdim=True).expand_as(onehot0)  # B x N x HW make none key points 0
-        onehot0 *= mask
         if self.kernel_size > 0:
-            onehot1 = self.gaussian_filter(onehot0.view(B, N, H, W)).view(B, N, H * W)  # add gaussian blur
-            onehot2 = self.gaussian_filter(onehot1.view(B, N, H, W)).view(B, N, H * W)  # add gaussian blur
-            onehot1 *= mask
-            onehot2 *= mask
+            onehot0 = self.gaussian_filter(onehot0.view(B, N, H, W)).view(B, N, H * W)  # add gaussian blur
+        onehot0 *= mask
 
-            # for n in range(N):
-        #     print(xyGt[0][n])
-        #     plt.imshow(onehot[0][n].cpu().view(H,W))
-        #     plt.show()
-        return onehot2, onehot1, onehot0
+        return onehot0
 
     def forward(self, Xg, keypoint_g, H, W):
         """
@@ -281,11 +246,7 @@ class InverInterpolator(Interpolator):
         if self.mode == 0:
             return self.get_1nn(Xg, keypoint_g, H, W)
         elif self.mode == 1:
-            return self.get_4nn(Xg, keypoint_g, H, W)[1]
-        elif self.mode == 2:
-            return self.get_4nn(Xg, keypoint_g, H, W)[0]
-        elif self.mode == 3:
             return self.get_4nn(Xg, keypoint_g, H, W)
 
-        return self.get_4nn(Xg, keypoint_g, H, W)[1]
+        return self.get_4nn(Xg, keypoint_g, H, W)
 
