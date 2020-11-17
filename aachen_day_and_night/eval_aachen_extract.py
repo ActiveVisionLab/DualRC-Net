@@ -28,7 +28,6 @@ parser.add_argument('--chunk_idx', type=int, default=0)
 parser.add_argument('--Npts', type=int, default=8000)
 parser.add_argument('--image_pairs', type=str, default='all')
 parser.add_argument('--iter_step', type=int, default=1000)
-parser.add_argument('--selection', type=str, default='partial')
 parser.add_argument('--device', type=int, default=0)
 parser.add_argument('--benchmark', type=bool, default=False)
 args = parser.parse_args()
@@ -87,7 +86,7 @@ for pair in tqdm(pair_names_chunk):
     hB_,wB_=tgt.shape[-2:]
 
     with torch.no_grad():
-        result, scores, features = matcher({'source_image':src, 'target_image':tgt}, num_pts=args.Npts, central_align=False, iter_step=args.iter_step, selection=args.selection, args=args)
+        result, scores, features = matcher({'source_image':src, 'target_image':tgt}, num_pts=args.Npts, central_align=False, iter_step=args.iter_step, args=args)
         # pdb.set_trace()
         corr4d, featureA_0, featureB_0 = features
         fs1, fs2 = featureA_0.shape[2:]

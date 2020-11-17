@@ -39,7 +39,6 @@ parser.add_argument('--sequence_list', type=str, default='image_list_hpatches_se
 parser.add_argument('--image_size', type=int, default=1600, help='image size used')
 parser.add_argument('--Npts', type=int, default=2000, help='how many matches selected')
 parser.add_argument('--iter_step', type=int, default=1000)
-parser.add_argument('--selection', type=str, default='partial')
 parser.add_argument('--im_fe_ratio', type=int, default=16)
 parser.add_argument('--device', type=int, default=0, help='which gpu should the experiment be run on')
 parser.add_argument('--benchmark', type=bool, default=False, help='whether to benchmark the speed. If does, it will use the first image for 20 times')
@@ -51,8 +50,8 @@ feature_extractor_device = args.device
 matcher = tools.ImgMatcher(use_cuda=use_cuda, half_precision=half_precision, checkpoint=args.checkpoint, postprocess_device=feature_extractor_device, im_fe_ratio=args.im_fe_ratio)
 
 if not args.benchmark:
-    experiment_name = '%s_%d_%d_%s' % (args.experiment_name, args.image_size, args.Npts, args.selection)
-    output_name = 'hpatches_%s_%d_%d_%s.txt' % (args.experiment_name, args.image_size, args.Npts, args.selection)
+    experiment_name = '%s_%d_%d' % (args.experiment_name, args.image_size, args.Npts)
+    output_name = 'hpatches_%s_%d_%d.txt' % (args.experiment_name, args.image_size, args.Npts)
     out = open(output_name, 'w')
     print(output_name)
 
@@ -109,7 +108,7 @@ with torch.no_grad():
             batch['target_image'] = ref_im.cuda()
 
             start = time.time()
-            matches, score, _ = matcher(batch, num_pts=args.Npts, central_align=True, iter_step=args.iter_step, selection=args.selection)
+            matches, score, _ = matcher(batch, num_pts=args.Npts, central_align=True, iter_step=args.iter_step)
             end = time.time()
 
             if args.benchmark:

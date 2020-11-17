@@ -1,6 +1,3 @@
-'''
-Train ncnet with strong loss
-'''
 import os
 import numpy as np
 import numpy.random

@@ -31,7 +31,6 @@ parser.add_argument('--Npts', type=int, default=2000)
 parser.add_argument('--n_queries', type=int, default=356)
 parser.add_argument('--n_panos', type=int, default=10)
 parser.add_argument('--iter_step', type=int, default=1000)
-parser.add_argument('--selection', type=str, default='partial')
 parser.add_argument('--im_fe_ratio', type=int, default=16)
 parser.add_argument('--device', type=int, default=0)
 parser.add_argument('--benchmark', type=bool, default=False)
@@ -47,7 +46,7 @@ half_precision = True
 model = tools.ImgMatcher(use_cuda=use_cuda, half_precision=half_precision, checkpoint=args.checkpoint, postprocess_device=feature_extractor_device, im_fe_ratio=args.im_fe_ratio)
 
 # Generate output folder path
-output_folder = args.experiment_name + '_'+ args.selection
+output_folder = args.experiment_name
 print('Output matches folder: '+output_folder)
 
 scale_factor = 0.0625
@@ -103,7 +102,7 @@ for q in queries_idx_chunk:
             hB,wB=tgt.shape[-2:]
             tgt=resize(normalize(tgt), args.image_size, scale_factor)
             hB_,wB_=tgt.shape[-2:]
-            result, scores, _ = model({'source_image': src, 'target_image': tgt}, num_pts=args.Npts, central_align=True, iter_step=args.iter_step, selection=args.selection, args=args)
+            result, scores, _ = model({'source_image': src, 'target_image': tgt}, num_pts=args.Npts, central_align=True, iter_step=args.iter_step, args=args)
             H_src, W_src = src.shape[-2:]
             H_tgt, W_tgt = tgt.shape[-2:]
 
