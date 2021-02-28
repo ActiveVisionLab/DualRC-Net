@@ -141,9 +141,9 @@ class ImgMatcher:
 
         self.model = ImMatchNet(use_cuda=use_cuda, multi_gpu=multi_gpu, half_precision=half_precision, checkpoint=checkpoint)
         self.model.eval()
+        self.im_fe_ratio = im_fe_ratio
         self.feature_extractor = ExtractFeatureMap(im_fe_ratio=self.im_fe_ratio, device=postprocess_device)
         self.postprocess_device = postprocess_device
-        self.im_fe_ratio = im_fe_ratio
 
     def __call__(self, batch, num_pts=2000, iter_step=1000, central_align = True, *args, **kwargs):
         '''
